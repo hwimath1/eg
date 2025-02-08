@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>연립부등식의 풀이(2)</title>
+  <!-- MathJax 로드 (LaTeX 수식을 사용하기 위함) -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    defer
+  ></script>
+
+  <style>
+    /* 흑백 테마 */
+    body {
+      margin: 20px;
+      background-color: white;
+      color: black;
+      font-family: sans-serif;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+
+    .centerBox {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .energyBarContainer {
+      width: 200px;
+      height: 20px;
+      border: 1px solid black;
+      margin: 10px 0;
+      background-color: white;
+      position: relative;
+    }
+    .energyBarFill {
+      height: 100%;
+      background-color: black;
+      transition: width 0.2s linear;
+    }
+
+    .problemBox {
+      border: 1px solid black;
+      padding: 15px;
+      margin-bottom: 10px;
+    }
+
+    .choiceBox {
+      margin-left: 20px;
+      margin-bottom: 8px;
+    }
+
+    /* 하얀색 배경에 검은색 글자 외 다른 색은 사용하지 않음 */
+    button {
+      background-color: white;
+      color: black;
+      border: 1px solid black;
+      margin: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: black;
+      color: white;
+    }
+
+    #response {
+      white-space: pre;
+      border: 1px dashed black;
+      margin-top: 10px;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>연립부등식의 풀이(2)</h1>
+
+<!-- 이름 입력 영역 -->
+<div class="centerBox">
+  <div>
+    <label for="playerName">이름: </label>
+    <input type="text" id="playerName" style="text-align:center;" />
+  </div>
+</div>
+
+<!-- 난이도 선택 영역 -->
+<div class="centerBox">
+  <div>
+    <h3>난이도를 선택하세요</h3>
+    <button onclick="startGame('최상')">최상 (20초, 문제당 20점)</button>
+    <button onclick="startGame('상')">상 (30초, 문제당 15점)</button>
+    <button onclick="startGame('중')">중 (40초, 문제당 13점)</button>
+    <button onclick="startGame('하')">하 (시간제한 없음, 문제당 10점)</button>
+  </div>
+</div>
+
+<!-- 게임 진행 영역 -->
+<div id="gameArea" style="display:none;">
+  <div style="text-align:center;">
+    <p id="difficultyInfo"></p>
+    <p id="scoreInfo"></p>
+    <p id="chanceInfo"></p>
+    <p id="timeInfo"></p>
+    <div class="energyBarContainer">
+      <div class="energyBarFill" id="energyBar" style="width:100%;"></div>
+    </div>
+  </div>
+  <div id="problemContainer"></div>
+</div>
+
+<!-- 게임 종료 및 점수 전송 영역 -->
+<div id="endArea" style="display:none; text-align:center;">
+  <h2>게임 종료</h2>
+  <p id="finalMessage"></p>
+  <p id="finalScore"></p>
+  <p id="finalElapsed"></p>
+  <button onclick="sendScore()">점수 전송</button>
+  <div id="response"></div>
+</div>
+
+<script>
+// ----- 문제들 (답이 "해가 없다"인 것은 제외) -----
+// 문제 순서는 무작위로 섞어 내보낼 것이므로, 아래 배열의 순서가 실제 출제 순서는 아님.
+// "번호는 생략" 지침에 따라, 문제 텍스트 자체에는 별도 번호를 달지 않음.
+// 각 객체의 구조:
+// {
+//   problem: "문제문(조건+질문)",
+//   choices: ["보기1", "보기2", "보기3", "보기4"],
+//   correct: 정답의 인덱스(0~3)
+// }
+
+const questionsData = [
+  {
+    problem: "다음 부등식 \\(-3 < 2x + 1 \\le 5\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-2 < x \\le 2\\)",
+      "\\(-2 \\le x < 2\\)",
+      "\\(x \\le -2\\)",
+      "\\(-2 < x < 2\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "연립부등식 \\(\\begin{cases} 3x + 1 \\le 2x + 5 \\\\ 2x + 5 < 3 \\end{cases}\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x < -1\\)",
+      "\\(-1 \\le x < 3\\)",
+      "\\(x \\ge 3\\)",
+      "\\(x > -1\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(5x - 3 < 4x - 1 < 7x + 5\\) 를 동시에 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x < -2\\)",
+      "\\(-2 \\le x < 2\\)",
+      "\\(x > 2\\)",
+      "\\(-2 < x < 2\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(2x - 8 < 3x - 2 \\le x + 6\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x \\le -6 \\text{ 또는 } x > 4\\)",
+      "\\(x \\ge -6\\)",
+      "\\(-6 < x \\le 4\\)",
+      "\\(-6 < x < 4\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(2x < 3x - 5 \\le 8x + 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x > 5\\)",
+      "\\(5 \\ge x\\)",
+      "\\(-5 < x < 2\\)",
+      "\\(x \\le -2\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(2x - 1 \\le 3x + 4 \\le x + 8\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-5 < x < 2\\)",
+      "\\(-2 \\le x \\le 5\\)",
+      "\\(x \\le -5 \\text{ 또는 } x \\ge 2\\)",
+      "\\(-5 \\le x \\le 2\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(2(x - 3) < x - 5 \\le 3x - 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-1 \\le x < 0\\)",
+      "\\(x < 0 \\text{ 또는 } x > 1\\)",
+      "\\(0 \\le x < 1\\)",
+      "\\(1 \\le x < 2\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(\\begin{cases} 2(x+2) \\le 3x - 1 \\\\ 3x - 1 < 4(2x+1) + 5 \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(-2 < x < 5\\)",
+      "\\(x \\ge 5\\)",
+      "\\(x > 2\\)",
+      "\\(x \\le -2\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\begin{cases} -\\dfrac12 x \\le x + 1 \\\\ x + 1 < 2(5 - x) \\end{cases}\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-\\tfrac23 \\le x < 3\\)",
+      "\\(x > 3\\)",
+      "\\(-3 \\le x < \\tfrac23\\)",
+      "\\(x < -\\tfrac23\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(-5 < -4x + 7 \\le 3\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-5 < x < 3\\)",
+      "\\(x < 1 \\text{ 또는 } x \\ge 3\\)",
+      "\\(1 < x \\le 3\\)",
+      "\\(1 \\le x < 3\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} 2x - 3 \\le 3(x+1) \\\\ 3(x+1) < 2(x+5) \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(-6 < x < 7\\)",
+      "\\(-6 \\le x < 7\\)",
+      "\\(-7 < x < 6\\)",
+      "\\(-6 < x < 7\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\begin{cases} x - 2 < 2x \\\\ 2x \\le -x + 3 \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(-2 < x \\le 1\\)",
+      "\\(x > -2\\)",
+      "\\(-2 \\le x < 1\\)",
+      "\\(x < 1\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} 5(x - 3) \\le 2x + 3 \\\\ 2x + 3 < 4x - 1 \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(x < 2\\)",
+      "\\(x > 6\\)",
+      "\\(2 < x \\le 6\\)",
+      "\\(2 \\le x < 6\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(\\begin{cases} 4x - 7 < -3x + 14 \\\\ -3x + 14 \\le 2x + 9 \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(1 \\le x < 3\\)",
+      "\\(-3 < x < 1\\)",
+      "\\(x \\ge 3\\)",
+      "\\(x < 1\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} x + 5 < 2(a + 1) \\\\ 2x - 3 < 5x + 6 \\end{cases}\\) 의 해가 \\(-3 < x < 1\\)이 되도록 하는 \\(a\\)를 구하시오.",
+    choices: [
+      "\\(1\\)",
+      "\\(-1\\)",
+      "\\(4\\)",
+      "\\(2\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} 1 - 2x < 3x + 11 \\\\ 4x + 3 < 2x + a \\end{cases}\\) 의 해가 \\(-2 < x < 3\\)이 되도록 하는 \\(a\\)의 값은?",
+    choices: [
+      "\\(5\\)",
+      "\\(9\\)",
+      "\\(-3\\)",
+      "\\(0\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\begin{cases} -2x + 3 < 5x - 4 \\\\ 3a - x \\ge 2x + 3 \\end{cases}\\) 의 해가 \\(1 < x \\le 3\\)이 되도록 하는 \\(a\\)는?",
+    choices: [
+      "\\(4\\)",
+      "\\(-1\\)",
+      "\\(9\\)",
+      "\\(0\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} 3x - a > 5x + 2 \\\\ 2x + 3 < 3x - 1 \\end{cases}\\) 의 해가 \\(4 < x < 6\\)이 되도록 하는 \\(a\\)의 범위는?",
+    choices: [
+      "\\(a = -14\\)",
+      "\\(-10 < a < -14\\)",
+      "\\(a \\ge -10\\)",
+      "\\(-14 \\le a < -10\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} 4x \\le 6x + 2 \\\\ 2x - a \\ge 4x + 1 \\end{cases}\\) 의 해가 \\(-1 \\le x \\le 2\\)이 되도록 하는 \\(a\\)의 값은?",
+    choices: [
+      "\\(-5\\)",
+      "\\(5\\)",
+      "\\(-4\\)",
+      "\\(0\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} -3(x-2) \\ge 2x - 4 \\\\ 7 - 2x \\le 2x - 1 \\end{cases}\\) 의 해를 구하시오.",
+    choices: [
+      "\\(-2 < x < 3\\)",
+      "\\(모든 실수\\ x\\)",
+      "\\(해가\\ 없다\\)",
+      "\\(x = 2\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} x - 4 > a \\\\ 5 - 3x \\ge 2x \\end{cases}\\) 가 해를 갖도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "그런 \\(a\\)는 없다",
+      "\\(a > -3\\)",
+      "\\(-4 < a < 3\\)",
+      "\\(a < -3\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} x \\le 3(x - 2) \\\\ 4x + 1 \\le a \\end{cases}\\) 가 해를 갖도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a \\ge 13\\)",
+      "\\(a > 1\\)",
+      "\\(a < 13\\)",
+      "\\(-1 < a < 13\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} 3(x + a) \\le 2 \\\\ 2x + 3 < 3x - 1 \\end{cases}\\) 가 해를 갖도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a \\ge -\\dfrac{10}{3}\\)",
+      "\\(a < -\\dfrac{10}{3}\\)",
+      "모든 \\(a\\)",
+      "\\(a > -\\dfrac{10}{3}\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\begin{cases} a - 2 < 2x \\\\ 3x + 4 < 2(x - 1) \\end{cases}\\) 가 해를 갖도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "그런 \\(a\\)는 없다",
+      "\\(a > -10\\)",
+      "\\(a \\le -10\\)",
+      "\\(a < -10\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} 2x - 5 > 3 \\\\ x + 2 \\le a \\end{cases}\\) 가 해를 갖지 않도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a < 6\\)",
+      "그런 \\(a\\)는 없다",
+      "\\(a = 6\\)",
+      "\\(a > 6\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} 5x + 6 \\ge 4x + 2 \\\\ 2x - a > 3(x + 1) \\end{cases}\\) 가 해를 갖지 않도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a < 1\\)",
+      "\\(a = 1\\)",
+      "\\(a \\ge 1\\)",
+      "\\(a \\le 1\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(\\begin{cases} 2(2x+1) \\le 3x + 4 \\\\ x + 3 < 2x - a \\end{cases}\\) 를 만족하는 정수 해가 3개가 되도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "해가 없다",
+      "\\(-4 \\le a < -3\\)",
+      "\\(a < -4\\)",
+      "\\(-3 \\le a < -1\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\begin{cases} 4(x - 1) - 3 \\le 1 \\\\ x - a \\ge 0 \\end{cases}\\) 를 만족하는 정수 \\(x\\)가 1개가 되도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a > 2\\)",
+      "\\(a \\le 1\\)",
+      "\\(1 < a \\le 2\\)",
+      "모든 \\(a\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(\\begin{cases} 3x + 5 \\le 2x + 7 \\\\ 2x + a > 5 \\end{cases}\\) 를 만족하는 정수 해가 2개가 되도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a \\le 3\\)",
+      "\\(a > 5\\)",
+      "해가 없다",
+      "\\(3 < a \\le 5\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\begin{cases} 4 - 3x \\le 5 - 2x \\\\ x - 3a \\le 0 \\end{cases}\\) 를 만족하는 정수 해가 4개가 되도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(\\dfrac{2}{3} \\le a < 1\\)",
+      "\\(a \\ge 1\\)",
+      "해가 없다",
+      "\\(a < -1\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(\\begin{cases} x + 7 > 2x + 5 \\\\ 3x + a > 4 \\end{cases}\\) 를 만족하는 정수 해가 2개가 되도록 하는 \\(a\\)의 범위를 구하시오.",
+    choices: [
+      "\\(a \\le 4\\)",
+      "해가 없다",
+      "\\(4 < a \\le 7\\)",
+      "\\(a > 7\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(|5 - x| < 4\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(1 < x < 9\\)",
+      "\\(x \\ge 9\\)",
+      "\\(-3 < x < 3\\)",
+      "\\(x \\le 1\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|x - 3| < 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-2 \\le x \\le 8\\)",
+      "\\(-2 < x < 8\\)",
+      "모든 \\(x\\)",
+      "\\(-8 < x < 2\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(|x + 1| \\ge 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "해가 없다",
+      "\\(-4 < x < 2\\)",
+      "\\(x \\le -4 \\text{ 또는 } x \\ge 2\\)",
+      "\\(-4 \\le x \\le 2\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(|2x - 3| < 1\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x > 2\\)",
+      "\\(1 < x < 2\\)",
+      "해가 없다",
+      "\\(x < 1\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(|x - 2| \\le 4\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x < -2 \\text{ 또는 } x > 6\\)",
+      "\\(-2 < x < 6\\)",
+      "해가 없다",
+      "\\(-2 \\le x \\le 6\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(|3x - 2| \\ge 4\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x \\le -\\tfrac{2}{3} \\text{ 또는 } x \\ge 2\\)",
+      "\\(-\\tfrac{2}{3} < x < 2\\)",
+      "해가 없다",
+      "모든 \\(x\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|2x + 1| \\le 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-3 < x < 2\\)",
+      "\\(x < -3 \\text{ 또는 } x > 2\\)",
+      "\\(-3 \\le x \\le 2\\)",
+      "해가 없다"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(|2 - x| \\ge 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "모든 \\(x\\)",
+      "\\(x \\le -1 \\text{ 또는 } x \\ge 5\\)",
+      "\\(-1 < x < 5\\)",
+      "해가 없다"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(|5 - x| < 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-3 < x < 3\\)",
+      "\\(-3 \\le x \\le 3\\)",
+      "해가 없다",
+      "\\(2 < x < 8\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(\\left|\\dfrac{2 - x}{3}\\right| > 1\\) 을 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x < -1 \\text{ 또는 } x > 5\\)",
+      "모든 \\(x\\)",
+      "해가 없다",
+      "\\(-1 < x < 5\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|3x - 2| \\ge 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-1 < x < \\tfrac{7}{3}\\)",
+      "\\(\\tfrac{7}{3} < x < 5\\)",
+      "\\(x \\le -1 \\text{ 또는 } x \\ge \\tfrac{7}{3}\\)",
+      "해가 없다"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(|2x - 1| > 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "모든 \\(x\\)",
+      "\\(x < -1 \\text{ 또는 } x > 2\\)",
+      "\\(-1 \\le x \\le 2\\)",
+      "해가 없다"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(|2x - 5| \\le 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(1 \\le x \\le 4\\)",
+      "해가 없다",
+      "\\(-1 < x < 4\\)",
+      "\\(x \\ge 4\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|6 - x| > 1\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "모든 \\(x\\)",
+      "해가 없다",
+      "\\(x < 5 \\text{ 또는 } x > 7\\)",
+      "\\(5 \\le x \\le 7\\)"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(1 < |4x + 1| < 6\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-\\tfrac{7}{4} \\le x \\le -\\tfrac{1}{2}\\)",
+      "\\(-1 < x < 7\\)",
+      "모든 \\(x\\)",
+      "\\(-\\tfrac{7}{4} < x < -\\tfrac{1}{2} \\text{ 또는 } 0 < x < \\tfrac{5}{4}\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(|2x - 1| < x + 4\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "모든 \\(x\\)",
+      "\\(-1 < x < 5\\)",
+      "\\(-5 < x < 1\\)",
+      "해가 없다"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(|2x + 1| < x + 2\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-1 < x < 1\\)",
+      "해가 없다",
+      "\\(1 \\le x \\le 2\\)",
+      "모든 \\(x\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|x - 1| \\ge 2x + 3\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(-1 \\le x \\le 1\\)",
+      "해가 없다",
+      "모든 \\(x\\)",
+      "\\(x \\le -\\tfrac{2}{3}\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(|x + 1| < 2x - 1\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "\\(x > 2\\)",
+      "해가 없다",
+      "\\(0.5 < x < 2\\)",
+      "모든 \\(x\\)"
+    ],
+    correct: 0
+  },
+  {
+    problem: "\\(|x + 2| > 3x - 4\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "해가 없다",
+      "모든 \\(x\\)",
+      "\\(x > 3\\)",
+      "\\(x < 3\\)"
+    ],
+    correct: 3
+  },
+  {
+    problem: "\\(|x| + |x + 3| < 5\\) 를 만족하는 \\(x\\)의 범위를 구하시오.",
+    choices: [
+      "모든 \\(x\\)",
+      "\\(-1 < x < 4\\)",
+      "\\(-4 < x < 1\\)",
+      "해가 없다"
+    ],
+    correct: 2
+  },
+  {
+    problem: "\\(|x - a| \\le 3\\) 의 해가 \\(-2 \\le x \\le 4\\)가 되도록 하는 \\(a\\)는?",
+    choices: [
+      "\\(-2\\)",
+      "\\(1\\)",
+      "\\(2\\)",
+      "\\(-1\\)"
+    ],
+    correct: 1
+  },
+  {
+    problem: "\\(\\left|\\dfrac{1}{3} x - 1\\right| > a\\ (a>0)\\) 의 해가 \\(x \\le -3\\) 또는 \\(x > 9\\)가 되도록 하는 \\(a\\)는?",
+    choices: [
+      "\\(1\\)",
+      "\\(3\\)",
+      "\\(2\\)",
+      "\\(0.5\\)"
+    ],
+    correct: 2
+  }
+];
+
+// 난이도별 정보
+let timeLimit = 0;  // 초기 제한시간(초)
+let scorePerQuestion = 0;  // 문제당 점수
+let globalTimer = null;    // 전체 타이머
+let problemTimer = null;   // 문제별 타이머
+let totalElapsed = 0;      // 전체 경과 시간(초)
+let isGameOver = false;
+let currentQuestionIndex = 0;
+let currentTimeLeft = 0;   // 남은 시간 (초)
+let score = 0;
+let chance = 3;
+let usedIndices = [];      // 이미 출제된 문제의 인덱스들
+
+// 문제 배열을 무작위로 섞어준다. (문항 순서 무작위)
+function shuffleQuestions(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const r = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[r]] = [arr[r], arr[i]];
+  }
+}
+shuffleQuestions(questionsData);
+
+function startGame(difficulty) {
+  const nameInput = document.getElementById("playerName");
+  if (!nameInput.value) {
+    alert("이름을 입력해주세요!");
+    return;
+  }
+
+  document.getElementById("gameArea").style.display = "block";
+  document.getElementById("endArea").style.display = "none";
+
+  switch(difficulty) {
+    case "최상":
+      timeLimit = 20;
+      scorePerQuestion = 20;
+      break;
+    case "상":
+      timeLimit = 30;
+      scorePerQuestion = 15;
+      break;
+    case "중":
+      timeLimit = 40;
+      scorePerQuestion = 13;
+      break;
+    case "하":
+      timeLimit = 0;
+      scorePerQuestion = 10;
+      break;
+  }
+
+  document.getElementById("difficultyInfo").innerText 
+    = `난이도: ${difficulty} (문제당 ${scorePerQuestion}점)`;
+  chance = 3;
+  score = 0;
+  totalElapsed = 0;
+  isGameOver = false;
+  usedIndices = [];
+  currentQuestionIndex = 0;
+
+  document.getElementById("scoreInfo").innerText = `점수: 0`;
+  document.getElementById("chanceInfo").innerText = `남은 기회: 3`;
+  document.getElementById("timeInfo").innerText = ``;
+
+  if (globalTimer) clearInterval(globalTimer);
+  globalTimer = setInterval(() => {
+    if (!isGameOver) {
+      totalElapsed++;
+    }
+  }, 1000);
+
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if (chance <= 0) {
+    endGame();
+    return;
+  }
+  if (usedIndices.length >= questionsData.length) {
+    endGame();
+    return;
+  }
+
+  let idx = usedIndices.length;
+  let questionObj = questionsData[idx];
+  usedIndices.push(idx);
+
+  currentQuestionIndex = idx;
+  const problemContainer = document.getElementById("problemContainer");
+  problemContainer.innerHTML = "";
+
+  const box = document.createElement("div");
+  box.className = "problemBox";
+
+  const p = document.createElement("p");
+  p.innerHTML = questionObj.problem;
+  box.appendChild(p);
+
+  questionObj.choices.forEach((choiceText, i) => {
+    const cb = document.createElement("div");
+    cb.className = "choiceBox";
+    cb.innerHTML = `<button onclick="checkAnswer(${i})">${choiceText}</button>`;
+    box.appendChild(cb);
+  });
+
+  problemContainer.appendChild(box);
+  MathJax.typeset();
+
+  if (timeLimit > 0) {
+    currentTimeLeft = timeLimit;
+    if (problemTimer) clearInterval(problemTimer);
+    document.getElementById("energyBar").style.width = "100%";
+    problemTimer = setInterval(() => {
+      if (isGameOver) {
+        clearInterval(problemTimer);
+      } else {
+        currentTimeLeft--;
+        const ratio = (currentTimeLeft / timeLimit) * 100;
+        const bar = document.getElementById("energyBar");
+        bar.style.width = ratio + "%";
+
+        if (currentTimeLeft <= 0) {
+          clearInterval(problemTimer);
+          chance--;
+          document.getElementById("chanceInfo").innerText = `남은 기회: ${chance}`;
+          showAnswer();
+          setTimeout(() => {
+            nextQuestion();
+          }, 1000);
+        }
+      }
+    }, 1000);
+  } else {
+    document.getElementById("energyBar").style.width = "100%";
+  }
+}
+
+function checkAnswer(choiceIndex) {
+  if (isGameOver) return;
+  const qObj = questionsData[currentQuestionIndex];
+  const correctIndex = qObj.correct;
+  clearInterval(problemTimer);
+
+  if (choiceIndex === correctIndex) {
+    score += scorePerQuestion;
+    document.getElementById("scoreInfo").innerText = `점수: ${score}`;
+  } else {
+    chance--;
+    document.getElementById("chanceInfo").innerText = `남은 기회: ${chance}`;
+    showAnswer();
+  }
+
+  if (chance <= 0) {
+    endGame();
+    return;
+  }
+
+  setTimeout(() => {
+    nextQuestion();
+  }, 1000);
+}
+
+function showAnswer() {
+  const qObj = questionsData[currentQuestionIndex];
+  const correctChoiceText = qObj.choices[qObj.correct];
+  const problemContainer = document.getElementById("problemContainer");
+  const reveal = document.createElement("p");
+  reveal.innerText = `정답: ${correctChoiceText}`;
+  problemContainer.appendChild(reveal);
+  MathJax.typeset();
+}
+
+function endGame() {
+  isGameOver = true;
+  clearInterval(problemTimer);
+  clearInterval(globalTimer);
+
+  document.getElementById("gameArea").style.display = "none";
+  document.getElementById("endArea").style.display = "block";
+
+  let message = "";
+  if (chance <= 0) {
+    message = "3회 틀려서 게임이 종료되었습니다.";
+  } else {
+    message = "문제를 모두 풀었습니다!";
+  }
+  document.getElementById("finalMessage").innerText = message;
+  document.getElementById("finalScore").innerText = `최종 점수: ${score}`;
+  document.getElementById("finalElapsed").innerText 
+    = `(전체 게임 진행 시간: 약 ${totalElapsed}초 경과)`;
+}
+
+function sendScore() {
+  const gameName = "연립부등식의 풀이(2)";
+  const player = document.getElementById("playerName").value || "이름없음";
+  const elapsed = totalElapsed;
+
+  saveData(gameName, player, score, elapsed);
+}
+
+async function saveData(game, name, score, elapsedTime) {
+    const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+
+    const requestData = {
+        game,
+        name,
+        score: parseInt(score, 10),
+        elapsedTime: parseInt(elapsedTime, 10)
+    };
+
+    try {
+        const response = await fetch(FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        const responseData = await response.json();
+
+        if (response.ok) {
+            document.getElementById('response').innerText =
+                `성공: ${JSON.stringify(responseData, null, 2)}`;
+        } else {
+            document.getElementById('response').innerText =
+                `오류: ${JSON.stringify(responseData, null, 2)}`;
+        }
+    } catch (error) {
+        console.error('요청 실패:', error);
+        document.getElementById('response').innerText =
+            `네트워크 오류: ${error.message}`;
+    }
+}
+</script>
+
+</body>
+</html>
